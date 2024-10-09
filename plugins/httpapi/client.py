@@ -27,6 +27,7 @@ import ssl
 import base64
 from urllib import response
 from urllib.parse import urlencode
+import time
 
 # provided for convenience, should be
 LOGIN_PATH = "/api/fmc_platform/v1/auth/generatetoken"
@@ -103,12 +104,31 @@ class InternalHttpClient(object):
         """
         Handles an error by parsing the response, and raising an error if found in response body.
         """
-        if 'error' in response:
-            err = response.get('error')
-            msg = err.get('data') or err.get('message') or iter_messages(err.get('messages'))
-            # raise ConnectionError(to_text(msg, errors='surrogate_then_replace'), code=code)
-            # raise InternalHttpClientError('FMC Error: {0}'.format(msg), status_code)
-            raise InternalHttpClientError(msg, status_code)
+        if 'error' not in response:
+            return 0
+
+        err = response.get('error')
+        msg = err.get('data') or err.get('message') or iter_messages(err.get('messages'))
+
+        if 'Access token invalid' in msg:
+            self.send_refresh_token()
+            return 2
+
+        if 'Invalid refresh token' in msg:
+            self.send_login(self.username, self.password)
+            return 2
+
+        if int(status_code) == 429:
+            retry_after = response.getheader("Retry-After")
+            try:
+                time.sleep(int(retry_after))
+            except (TypeError, ValueError):
+                time.sleep(30)
+            return 2
+
+        # raise ConnectionError(to_text(msg, errors='surrogate_then_replace'), code=code)
+        # raise InternalHttpClientError('FMC Error: {0}'.format(msg), status_code)
+        raise InternalHttpClientError(msg, status_code)
 
 
 def iter_messages(messages):

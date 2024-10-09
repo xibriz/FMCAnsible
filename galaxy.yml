@@ -7,7 +7,7 @@ authors:
   - joe Agster <joeaxcdw>
   - Iurii Tymoshevskyi <itymo>
   - Sameer Singh <sameesin>
-  - Ruben Andreassen
+  - Ruben Andreassen <xibriz>
 
 description: An Ansible collection for managing Cisco Secure Firewall Management Center
 

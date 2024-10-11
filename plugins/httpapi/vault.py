@@ -12,8 +12,15 @@ class KsatVault:
     def __init__(self):
         # Authentication
         self.client = hvac.Client(
-            url=os.environ['VAULT_ADDR'],
-            token=os.environ['VAULT_TOKEN'],
+            url=os.environ['ANSIBLE_HASHI_VAULT_ADDR'],
+            # token=os.environ['VAULT_TOKEN'],
+        )
+        self.client.sys.enable_auth_method(
+            method_type=os.environ['ANSIBLE_HASHI_VAULT_AUTH_METHOD'],
+        )
+        self.client.auth.approle.login(
+            role_id=os.environ['ANSIBLE_HASHI_VAULT_ROLE_ID'],
+            secret_id=os.environ['ANSIBLE_HASHI_VAULT_SECRET_ID'],
         )
 
     def get_tokens(self):

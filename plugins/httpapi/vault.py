@@ -28,7 +28,7 @@ class Vault:
                 secret_id=vault_info[2],
             )
             f.close()
-        os.remove(TOKEN_PATH)
+        # os.remove(TOKEN_PATH)
 
     def get_tokens(self):
         # Reading a secret

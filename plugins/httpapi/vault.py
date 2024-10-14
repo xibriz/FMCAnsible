@@ -7,27 +7,34 @@ import hvac
 import os
 import time
 
-class KsatVault:
+TOKEN_PATH = '/tmp/vault_token'
+VAULT_PATH = 'automation_fmc_tokens'
+VAULT_MOUNT = 'network'
+
+class Vault:
 
     def __init__(self):
+        if not os.path.exists(TOKEN_PATH):
+            raise ValueError('No token file')
         # Authentication
-        self.client = hvac.Client(
-            url=os.environ['ANSIBLE_HASHI_VAULT_ADDR'],
-            # token=os.environ['VAULT_TOKEN'],
-        )
-        self.client.sys.enable_auth_method(
-            method_type=os.environ['ANSIBLE_HASHI_VAULT_AUTH_METHOD'],
-        )
-        self.client.auth.approle.login(
-            role_id=os.environ['ANSIBLE_HASHI_VAULT_ROLE_ID'],
-            secret_id=os.environ['ANSIBLE_HASHI_VAULT_SECRET_ID'],
-        )
+        with open(TOKEN_PATH) as f:
+            vault_info = f.read().splitlines()[-1].split(' ')
+
+            self.client = hvac.Client(
+                url=vault_info[0],
+            )
+            self.client.auth.approle.login(
+                role_id=vault_info[1],
+                secret_id=vault_info[2],
+            )
+            f.close()
+        os.remove(TOKEN_PATH)
 
     def get_tokens(self):
         # Reading a secret
         read_response = self.client.secrets.kv.v2.read_secret(
-            path='automation_fmc_tokens',
-            mount_point='network',
+            path=VAULT_PATH,
+            mount_point=VAULT_MOUNT,
             raise_on_deleted_version=False,
         )
 
@@ -39,8 +46,8 @@ class KsatVault:
 
     def update_tokens(self, access_token, refresh_tokens):
         self.client.secrets.kv.v2.patch(
-            path='automation_fmc_tokens',
-            mount_point='network',
+            path=VAULT_PATH,
+            mount_point=VAULT_MOUNT,
             secret={
                 'access_token': access_token,
                 'refresh_token': refresh_tokens,

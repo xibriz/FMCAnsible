@@ -28,9 +28,9 @@ import base64
 from urllib import response
 from urllib.parse import urlencode
 try:
-    from ansible_collections.cisco.fmcansible.plugins.httpapi.vault import KsatVault
+    from ansible_collections.cisco.fmcansible.plugins.httpapi.vault import Vault
 except ImportError:
-    KsatVault = None
+    Vault = None
 
 # provided for convenience, should be
 LOGIN_PATH = "/api/fmc_platform/v1/auth/generatetoken"
@@ -55,8 +55,10 @@ class InternalHttpClient(object):
         self.password = None
         self.access_token = None
         self.refresh_token = None
-        if KsatVault:
-            self.vault = KsatVault()
+        try:
+            self.vault = Vault()
+        except:
+            self.vault = None
 
     def send(self, url_path, data=None, method="GET", headers=None):
         """

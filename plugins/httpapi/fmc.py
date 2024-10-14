@@ -115,12 +115,12 @@ class HttpApi(HttpApiBase):
         if self._http_client is not None:
             return self._http_client
         if InternalHttpClient and self._use_internal_client:
-            try:
-                host = self.connection.get_option('host')
-                self._http_client = InternalHttpClient(host, TOKEN_PATH_TEMPLATE)
-            except Exception:
-                self._use_internal_client = False
-                self._http_client = None
+            # try:
+            host = self.connection.get_option('host')
+            self._http_client = InternalHttpClient(host, TOKEN_PATH_TEMPLATE)
+            # except Exception:
+            #     self._use_internal_client = False
+            #     self._http_client = None
         else:
             self._use_internal_client = False
             self._http_client = None

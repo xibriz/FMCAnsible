@@ -54,10 +54,10 @@ class InternalHttpClient(object):
         self.password = None
         self.access_token = None
         self.refresh_token = None
-        # try:
-        self.vault = Vault()
-        # except:
-        #     self.vault = None
+        try:
+            self.vault = Vault()
+        except:
+            self.vault = None
 
     def send(self, url_path, data=None, method="GET", headers=None):
         """

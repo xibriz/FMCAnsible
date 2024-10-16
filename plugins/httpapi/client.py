@@ -56,7 +56,7 @@ class InternalHttpClient(object):
         self.refresh_token = None
         try:
             self.vault = Vault()
-        except:
+        except Exception:
             self.vault = None
 
     def send(self, url_path, data=None, method="GET", headers=None):

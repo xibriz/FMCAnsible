@@ -45,15 +45,18 @@ class Vault:
         return secrets
 
     def update_tokens(self, access_token, refresh_tokens):
-        self.client.secrets.kv.v2.patch(
-            path=VAULT_PATH,
-            mount_point=VAULT_MOUNT,
-            secret={
-                'access_token': access_token,
-                'refresh_token': refresh_tokens,
-                'token_timestamp': round(time.time() * 1000),
-            },
-        )
+        try:
+            self.client.secrets.kv.v2.patch(
+                path=VAULT_PATH,
+                mount_point=VAULT_MOUNT,
+                secret={
+                    'access_token': access_token,
+                    'refresh_token': refresh_tokens,
+                    'token_timestamp': round(time.time() * 1000),
+                },
+            )
+        except Exception as e:
+            print(f"Could not store token to Vault: {e}")
 
     def _is_token_valid(self, secrets):
         try:

@@ -77,7 +77,7 @@ class InternalHttpClient(object):
 
         response = self._send_request(url_path, data, method, headers)
         response_body = self._parse_response_body(response)
-        if self._handle_error(response_body, response.status) == 2:
+        if self._handle_error(response_body, response.status) == 2 and url_path != LOGIN_PATH:
             # Retry send
             self.send(url_path, data, method, headers)
         # return the tuple just like connection.send
@@ -183,6 +183,12 @@ class InternalHttpClient(object):
         if 'Invalid refresh token' in msg:
             self.send_login(self.username, self.password)
             return 2
+
+        # if 'Invalid refresh token' in msg \
+        #     or 'User authentication failed' in msg:
+        #     self.vault.invalidate_tokens()
+        #     self.send_login(self.username, self.password)
+        #     return 2
 
         if int(status_code) == 429:
             try:

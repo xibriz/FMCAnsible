@@ -31,11 +31,13 @@ class Vault:
         # os.remove(TOKEN_PATH)
 
     def get_tokens(self):
+        """
+        https://hvac.readthedocs.io/en/stable/source/hvac_api_secrets_engines.html#hvac.api.secrets_engines.KvV2.read_secret
+        """
         # Reading a secret
-        read_response = self.client.secrets.kv.v2.read_secret(
+        read_response = self.client.secrets.kv.v2.read_secret_version(
             path=VAULT_PATH,
             mount_point=VAULT_MOUNT,
-            raise_on_deleted_version=False,
         )
 
         secrets = read_response['data']['data']
@@ -57,6 +59,20 @@ class Vault:
             )
         except Exception as e:
             print(f"Could not store token to Vault: {e}")
+
+    def invalidate_tokens(self):
+        try:
+            self.client.secrets.kv.v2.patch(
+                path=VAULT_PATH,
+                mount_point=VAULT_MOUNT,
+                secret={
+                    'access_token': "",
+                    'refresh_token': "",
+                    'token_timestamp': 0,
+                },
+            )
+        except Exception as e:
+            print(f"Could not invalidate token in Vault: {e}")
 
     def _is_token_valid(self, secrets):
         try:

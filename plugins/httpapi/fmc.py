@@ -89,11 +89,8 @@ INVALID_API_TOKEN_PATH_MSG = ('The API token path is incorrect. Please, check co
 MISSING_API_TOKEN_PATH_MSG = ('Ansible could not determine the API token path automatically. Please, '
                               'specify the `ansible_httpapi_fmc_token_path` variable in the inventory file.')
 
-try:
-    import display
-except ImportError:
-    from ansible.utils.display import Display
-    display = Display()
+from ansible.utils.display import Display
+display = Display()
 
 
 class HttpApi(HttpApiBase):
@@ -220,6 +217,8 @@ class HttpApi(HttpApiBase):
         return response_auth
 
     def logout(self):
+        # DO NOT LOG OUT ON EACH REQUEST
+        return
         auth_payload = {
             'grant_type': 'revoke_token',
             'access_token': self.access_token,

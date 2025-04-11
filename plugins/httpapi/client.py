@@ -8,8 +8,8 @@ __metaclass__ = type
 
 DOCUMENTATION = """
 ---
-author: Cisco
-httpapi : fmc
+author: Cisco Netsec TME
+name: FMC Ansible Module
 short_description: Internal client for FMC
 description:
   - Wraps urllib to make specific requests to FMC endpoint and parse the responses.
@@ -25,7 +25,10 @@ import json
 import http.client
 import ssl
 import base64
+from urllib import response
+# from urllib.parse import urlencode
 import time
+
 try:
     from ansible_collections.cisco.fmcansible.plugins.httpapi.vault import Vault
 except ImportError:
@@ -151,7 +154,10 @@ class InternalHttpClient(object):
         # ex:
         #     connection.send(url, data, method=http_method, headers=BASE_HEADERS)
         method = method.upper()
-        conn = http.client.HTTPSConnection(self._host, timeout=120, context=ssl._create_unverified_context())
+
+        timeout = 120 if method == "POST" else 30
+        conn = http.client.HTTPSConnection(self._host, timeout=timeout, context=ssl._create_unverified_context())
+
         conn.request(method, url_path, data, headers)
         # response
         response = conn.getresponse()
@@ -184,17 +190,11 @@ class InternalHttpClient(object):
             self.send_login(self.username, self.password)
             return 2
 
-        # if 'Invalid refresh token' in msg \
-        #     or 'User authentication failed' in msg:
-        #     self.vault.invalidate_tokens()
-        #     self.send_login(self.username, self.password)
-        #     return 2
-
         if int(status_code) == 429:
+            retry_after = response.getheader("Retry-After")
             try:
-                retry_after = response.getheader("Retry-After")
                 time.sleep(int(retry_after))
-            except:
+            except (TypeError, ValueError):
                 time.sleep(30)
             return 2
 

@@ -78,7 +78,7 @@ def construct_ansible_facts(response, params):
             facts[params['register_as']] = response_body
         # meignw2021
         # elif response_body.get('name') and response_body.get('type'):
-        elif type(response_body) is dict and response_body.get('name') and response_body.get('type'):
+        elif isinstance(response_body, dict) and response_body.get('name') and response_body.get('type'):
             object_name = re.sub(INVALID_IDENTIFIER_SYMBOLS, '_', response_body['name'].lower())
             fact_name = '%s_%s' % (response_body['type'], object_name)
             facts[fact_name] = response_body
@@ -188,7 +188,8 @@ def equal_values(v1, v2):
     if is_string(v1) and is_string(v2):
         return to_text(v1) == to_text(v2)
 
-    if type(v1) != type(v2):
+    # if type(v1) != type(v2):
+    if isinstance(v1, type(v2)):
         return False
     value_type = type(v1)
 
@@ -254,7 +255,8 @@ def add_missing_properties_left_to_right(d1, d2):
             else:
                 new_obj = empty_value(d1[key])
             d2[key] = new_obj
-        elif type(d1[key]) == dict and type(d2[key]) == dict:
+        # elif type(d1[key]) == dict and type(d2[key]) == dict:
+        elif isinstance(d1[key], dict) and isinstance(d2[key], dict):
             add_missing_properties_left_to_right(d1[key], d2[key])
 
 
@@ -284,7 +286,8 @@ def delete_ref_duplicates(d):
     """
 
     def delete_ref_duplicates_from_list(refs):
-        if all(type(i) == dict and is_object_ref(i) for i in refs):
+        # if all(type(i) == dict and is_object_ref(i) for i in refs):
+        if all(isinstance(i, dict) and is_object_ref(i) for i in refs):
             unique_reference_map = OrderedDict()
             for i in refs:
                 # some nested objects do not include type, so supply fallback value just in case
@@ -302,9 +305,11 @@ def delete_ref_duplicates(d):
     # meignw2021
     # for k, v in iteritems(d):
     for k, v in d.items():
-        if type(v) == list:
+        # if type(v) == list:
+        if isinstance(v, list):
             modified_d[k] = delete_ref_duplicates_from_list(v)
-        elif type(v) == dict:
+        # elif type(v) == dict:
+        elif isinstance(v, dict):
             modified_d[k] = delete_ref_duplicates(v)
         else:
             modified_d[k] = v

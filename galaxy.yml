@@ -1,6 +1,6 @@
 namespace: cisco
 name: fmcansible
-version: 1.0.4.1
+version: 1.0.4-ksat.1
 readme: README.md
 
 authors:

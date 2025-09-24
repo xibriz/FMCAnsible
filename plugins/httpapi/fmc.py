@@ -18,14 +18,15 @@
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from __future__ import (absolute_import, division, print_function)
+from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
 DOCUMENTATION = """
 ---
-author: "Ansible Networking Team"
-name: "FMCAnsible"
+author: First Last (@name)
+  - Ansible Networking Team (@cisco-netsec-team)
+name: fmc
 short_description: HttpApi Plugin for Cisco Secure Firewall device
 description:
   - This HttpApi plugin provides methods to connect to Cisco Secure Firewall
@@ -45,6 +46,20 @@ options:
     default: '/api/api-explorer/fmc.json'
     vars:
       - name: ansible_httpapi_fmc_spec_path
+  cdfmc:
+    type: bool
+    description:
+      - Specifies if the connection is to a Cisco Defense FMC
+    default: False
+    vars:
+      - name: ansible_httpapi_cdfmc
+  token:
+    type: str
+    description:
+      - Authentication token for CDFMC connection
+    default: ''
+    vars:
+      - name: ansible_httpapi_token
 """
 
 import json
@@ -52,22 +67,37 @@ import os
 import re
 
 from ansible import __version__ as ansible_version
-
+from ansible.errors import AnsibleConnectionFailure, AnsibleError
 from ansible.module_utils.basic import to_text
-from ansible.errors import AnsibleConnectionFailure
+from ansible.module_utils.connection import ConnectionError
 from ansible.module_utils.six.moves.urllib.error import HTTPError
 from ansible.module_utils.six.moves.urllib.parse import urlencode
 from ansible.plugins.httpapi import HttpApiBase
-from urllib3 import encode_multipart_formdata
-from urllib3.fields import RequestField
-from ansible.module_utils.connection import ConnectionError
+from ansible_collections.cisco.fmcansible.plugins.module_utils.common import (
+    HTTPMethod, ResponseParams)
+from ansible_collections.cisco.fmcansible.plugins.module_utils.fmc_swagger_client import (
+    FmcSwaggerParser, FmcSwaggerValidator, SpecProp)
 
-from ansible_collections.cisco.fmcansible.plugins.module_utils.fmc_swagger_client import FmcSwaggerParser, SpecProp, FmcSwaggerValidator
-from ansible_collections.cisco.fmcansible.plugins.module_utils.common import HTTPMethod, ResponseParams
+# InternalHttpClient import removed due to missing module
 try:
-    from ansible_collections.cisco.fmcansible.plugins.httpapi.client import InternalHttpClient
+    from ansible_collections.cisco.fmcansible.plugins.httpapi.client import \
+        InternalHttpClient
 except ImportError:
     InternalHttpClient = None
+
+try:
+    from urllib3 import encode_multipart_formdata
+except ImportError as imp_exc:
+    URLLIB3_IMPORT_ERROR = imp_exc
+else:
+    URLLIB3_IMPORT_ERROR = None
+
+try:
+    from urllib3.fields import RequestField
+except ImportError as imp_exc:
+    URLLIB3_IMPORT_ERROR = imp_exc
+else:
+    URLLIB3_IMPORT_ERROR = None
 
 BASE_HEADERS = {
     'Content-Type': 'application/json',
@@ -105,6 +135,8 @@ class HttpApi(HttpApiBase):
         self._ignore_http_errors = False
         self._use_internal_client = use_internal_client
         self._http_client = None
+        self.token = None
+        self.cdfmc = False
 
     @property
     def http_client(self):
@@ -126,6 +158,15 @@ class HttpApi(HttpApiBase):
         return self._http_client
 
     def login(self, username, password):
+        # For CDFMC, we just need to set the bearer token
+        if self.get_option('cdfmc'):
+            self.cdfmc = True
+            self.token = self.get_option('token')
+            if not self.token:
+                raise AnsibleConnectionFailure('Token is required when using CDFMC')
+            BASE_HEADERS['Authorization'] = 'Bearer {0}'.format(self.token)
+            return
+
         def request_token_payload(username, password):
             return {
                 'grant_type': 'password',
@@ -161,20 +202,10 @@ class HttpApi(HttpApiBase):
             self.access_token = response['X-auth-access-token']
             self.global_domain = response['global']
             self.domains = response['DOMAINS']
-            print('don_domains')
-            print(self.refresh_token)
-            print(self.access_token)
-            print(self.global_domain)
-            print(self.domains)
-            print(type(self.domains))
             global domains_struct
             domains_struct = self.domains
             domains_struct = json.loads(domains_struct)
-            print(domains_struct)
-            print(type(domains_struct))
-            print('don_domains1')
             BASE_HEADERS['X-auth-access-token'] = self.access_token
-            print(BASE_HEADERS)
         except KeyError:
             raise ConnectionError(
                 'Server returned response without token info during connection authentication: %s' % response)
@@ -212,7 +243,7 @@ class HttpApi(HttpApiBase):
 
     def _send_login_request(self, payload, url):
         self._display(HTTPMethod.POST, 'login', url)
-        response, response_data = self._send_auth_request(
+        response, response_text = self._send_auth_request(
             url, json.dumps(payload), method=HTTPMethod.POST, headers=BASE_HEADERS
         )
         response_auth = response.info()
@@ -241,6 +272,8 @@ class HttpApi(HttpApiBase):
         self.access_token = None
 
     def _require_login(self):
+        if self.cdfmc:
+            return False
         return self.access_token is None
 
     def _send_auth_request(self, path, data, **kwargs):
@@ -261,7 +294,7 @@ class HttpApi(HttpApiBase):
         finally:
             self._ignore_http_errors = False
 
-    def update_auth(self, response, response_data):
+    def update_auth(self, response, response_text):
         # With tokens, authentication should not be checked and updated on each request
         return None
 
@@ -279,12 +312,13 @@ class HttpApi(HttpApiBase):
                 self._login(self.connection.get_option('remote_user'), self.connection.get_option('password'))
 
             if self.access_token is None and self.refresh_token is None:
-                return self._handle_send_error(http_method, "Verify your credentials or check the maximum number of allowed concurrent logins.", 401)
+                if self.cdfmc is True and self.token is None:
+                    return self._handle_send_error(http_method, "Verify your credentials or check the maximum number of allowed concurrent logins.", 401)
 
-            response, response_data = self._send(url, data, method=http_method, headers=BASE_HEADERS)
+            response, response_text = self._send(url, data, method=http_method, headers=BASE_HEADERS)
 
-            # response_data is bytearray, so convert to string
-            value = self._get_response_value(response_data)
+            # response_text is bytearray, so convert to string
+            value = self._get_response_value(response_text)
             self._display(http_method, 'response', value)
 
             return {
@@ -306,30 +340,34 @@ class HttpApi(HttpApiBase):
         url = construct_url_path(to_url)
         self._display(HTTPMethod.POST, 'upload', url)
         with open(from_path, 'rb') as src_file:
+            if URLLIB3_IMPORT_ERROR:
+                raise AnsibleError('urllib3 must be installed to use this plugin') from URLLIB3_IMPORT_ERROR
             rf = RequestField('fileToUpload', src_file.read(), os.path.basename(src_file.name))
             rf.make_multipart()
+            if URLLIB3_IMPORT_ERROR:
+                raise AnsibleError('urllib3 must be installed to use this plugin') from URLLIB3_IMPORT_ERROR
             body, content_type = encode_multipart_formdata([rf])
 
             headers = dict(BASE_HEADERS)
             headers['Content-Type'] = content_type
             headers['Content-Length'] = len(body)
 
-            dummy, response_data = self._send(url, data=body, method=HTTPMethod.POST, headers=headers)
-            value = self._get_response_value(response_data)
+            dummy, response_text = self._send(url, data=body, method=HTTPMethod.POST, headers=headers)
+            value = self._get_response_value(response_text)
             self._display(HTTPMethod.POST, 'upload:response', value)
             return self._response_to_json(value)
 
     def download_file(self, from_url, to_path, path_params=None):
         url = construct_url_path(from_url, path_params=path_params)
         self._display(HTTPMethod.GET, 'download', url)
-        response, response_data = self._send(url, data=None, method=HTTPMethod.GET, headers=BASE_HEADERS)
+        response, response_text = self._send(url, data=None, method=HTTPMethod.GET, headers=BASE_HEADERS)
 
         if os.path.isdir(to_path):
             filename = extract_filename_from_headers(response.info())
             to_path = os.path.join(to_path, filename)
 
         with open(to_path, "wb") as output_file:
-            output_file.write(response_data.getvalue())
+            output_file.write(response_text.getvalue())
         self._display(HTTPMethod.GET, 'downloaded', to_path)
 
     def handle_httperror(self, exc):
@@ -358,10 +396,17 @@ class HttpApi(HttpApiBase):
     def _login(self, username, password):
         if self.http_client:
             # login via http client
-            login_obj = self.http_client.send_login(username, password)
-            self.access_token = login_obj['access_token']
-            self.refresh_token = login_obj['refresh_token']
-            BASE_HEADERS['X-auth-access-token'] = self.access_token
+            if self.get_option('cdfmc'):
+                self.cdfmc = True
+                self.token = self.get_option('token')
+                if not self.token:
+                    raise AnsibleConnectionFailure('Token is required when using CDFMC')
+                BASE_HEADERS['Authorization'] = 'Bearer {0}'.format(self.token)
+            else:
+                login_obj = self.http_client.send_login(username, password)
+                self.access_token = login_obj['access_token']
+                self.refresh_token = login_obj['refresh_token']
+                BASE_HEADERS['X-auth-access-token'] = self.access_token
         else:
             # login using default approach
             return self.login(username, password)

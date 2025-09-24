@@ -25,20 +25,23 @@ import unittest
 
 from ansible.errors import AnsibleConnectionFailure
 from ansible.module_utils.connection import ConnectionError
-from ansible.module_utils.six import BytesIO, PY3, StringIO
+from ansible.module_utils.six import PY3, BytesIO, StringIO
 from ansible.module_utils.six.moves.urllib.error import HTTPError
 
 try:
     from unittest import mock
-    from unittest.mock import patch, mock_open
+    from unittest.mock import mock_open, patch
 except ImportError:
     # support for python 2.7
     import mock
     from mock import patch, mock_open
 
-from ansible_collections.cisco.fmcansible.plugins.httpapi.fmc import HttpApi, BASE_HEADERS, TOKEN_PATH_TEMPLATE, DEFAULT_API_VERSIONS
-from ansible_collections.cisco.fmcansible.plugins.module_utils.common import HTTPMethod, ResponseParams
-from ansible_collections.cisco.fmcansible.plugins.module_utils.fmc_swagger_client import FmcSwaggerParser, SpecProp
+from ansible_collections.cisco.fmcansible.plugins.httpapi.fmc import (
+    BASE_HEADERS, DEFAULT_API_VERSIONS, TOKEN_PATH_TEMPLATE, HttpApi)
+from ansible_collections.cisco.fmcansible.plugins.module_utils.common import (
+    HTTPMethod, ResponseParams)
+from ansible_collections.cisco.fmcansible.plugins.module_utils.fmc_swagger_client import (
+    FmcSwaggerParser, SpecProp)
 
 if PY3:
     BUILTINS_NAME = 'builtins'
@@ -51,14 +54,16 @@ class FakeFmcHttpApiPlugin(HttpApi):
         super(FakeFmcHttpApiPlugin, self).__init__(conn, False)
         self.hostvars = {
             'token_path': '/testLoginUrl',
-            'spec_path': '/testSpecUrl'
+            'spec_path': '/testSpecUrl',
+            'cdfmc': False,
+            'token': None
         }
 
     def get_option(self, var):
-        return self.hostvars[var]
+        return self.hostvars.get(var, None)
 
-    def set_option(self, var, val):
-        self.hostvars[var] = val
+    def set_option(self, option, value):
+        self.hostvars[option] = value
 
 
 class TestFmcHttpApi(unittest.TestCase):
@@ -398,7 +403,7 @@ class TestFmcHttpApi(unittest.TestCase):
     def _connection_response(response, status=200):
         response_mock = mock.Mock()
         response_mock.getcode.return_value = status
-        response_text = json.dumps(response) if type(response) is dict else response
+        response_text = json.dumps(response) if isinstance(response, dict) else response
         response_data = BytesIO(response_text.encode() if response_text else ''.encode())
         return response_mock, response_data
 
@@ -412,7 +417,7 @@ class TestFmcHttpApi(unittest.TestCase):
             'global': 'e276abec-e0f2-11e3-8169-6d9ed49b625f',
             'DOMAINS': '[{"uuid": "e276abec-e0f2-11e3-8169-6d9ed49b625f", "name":"Global"}]'
         }
-        if apply_base_headers and type(response_headers) is dict:
+        if apply_base_headers and isinstance(response_headers, dict):
             headers_dict = base_headers.copy()
             # rename tokens if needed
             headers_dict['X-auth-access-token'] = response_headers.get('X-auth-access-token') or response_headers.get('access_token') \

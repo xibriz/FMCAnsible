@@ -1,6 +1,6 @@
-#ansible==2.10.7
-ansible>=2.18.0
-#urllib3==1.26.5
-urllib3
-lxml
-requests
+# #ansible==2.10.7
+# ansible>=2.18.0
+# #urllib3==1.26.5
+# urllib3
+# lxml
+# requests

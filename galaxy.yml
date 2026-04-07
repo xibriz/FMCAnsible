@@ -1,16 +1,16 @@
 namespace: cisco
 name: fmcansible
-version: 1.0.10-ksat.2
+version: 1.1.10-ksat.3
 readme: README.md
 
 authors:
   - joe Agster <joeaxcdw>
   - Iurii Tymoshevskyi <itymo>
   - Sameer Singh <sameesin>
-  - Ruben Andreassen <xibriz>
   - Jeroen Wittock <jwittock>
   - Charan Teja <teande>
   - Suraj Netla Mundaje <snetlamu>
+  - Ruben Andreassen <xibriz>
 
 description: An Ansible collection for managing Cisco Secure Firewall Management Center
 

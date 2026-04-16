@@ -608,6 +608,19 @@ class BaseConfigurationResource(object):
         if is_post_request(op_spec) or is_put_request(op_spec):
             validate(self._conn.validate_data, ParamName.DATA, data)
 
+        # Handle false positive validation for createMultipleIPv4StaticRouteModel with Null0 interface,
+        # which does not require gateway parameter. This is a workaround for FMC validation until it is fixed on the server side.
+        false_report = {
+            "Invalid data provided": {
+                "required": ["gateway"]
+            }
+        }
+        if report \
+            and operation_name == "createMultipleIPv4StaticRouteModel" \
+            and data.get("interfaceName", "") == "Null0" \
+            and report == false_report:
+            return
+
         if report:
             raise ValidationError(report)
 
